@@ -1,15 +1,12 @@
 #include "node2cell.hpp"
 
-
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     auto lib = o::Library(&argc, &argv);
     auto world = lib.world();
     auto nrank = world->size();
     auto rank = world->rank();
 
-    if(argc != 2)
-    {
+    if (argc != 2) {
         printf("Usage: %s <mesh_file>\n", argv[0]);
         return 1;
     }

@@ -1,5 +1,17 @@
 #include "node2cell.hpp"
 
+#include <pcms/pcms.h>
+
+#include <Omega_h_adj.hpp>
+#include <Omega_h_array.hpp>
+#include <Omega_h_bbox.hpp>
+#include <Omega_h_file.hpp>
+#include <Omega_h_for.hpp>
+#include <Omega_h_matrix.hpp>
+#include <Omega_h_mesh.hpp>
+#include <Omega_h_shape.hpp>
+#include <Omega_h_vector.hpp>
+
 void set_sinxcosy_tag(o::Mesh& mesh) {
     // get the bounding box of the mesh
     Omega_h::BBox<2> bb = Omega_h::get_bounding_box<2>(&mesh);

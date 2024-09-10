@@ -1,3 +1,5 @@
+#include <Omega_h_file.hpp>
+
 #include "node2cell.hpp"
 
 int main(int argc, char* argv[]) {

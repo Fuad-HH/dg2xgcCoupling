@@ -18,4 +18,12 @@ target_link_libraries(node2cell_lib PUBLIC Omega_h::omega_h MPI::MPI_CXX pcms::p
 add_executable(node2cell main.cpp)
 target_link_libraries(node2cell PRIVATE node2cell_lib)
 
+add_executable(dg2xgcCoupler dg2xgcCoupler.cpp dg2xgcfieldAdapter.h)
+target_link_libraries(dg2xgcCoupler PRIVATE node2cell_lib)
+
+add_executable(dummydg2 dummydg2.cpp)
+add_executable(dummyxgc dummyxgc.cpp)
+target_link_libraries(dummydg2 PRIVATE node2cell_lib)
+target_link_libraries(dummyxgc PRIVATE node2cell_lib)
+
 

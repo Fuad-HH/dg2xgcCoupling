@@ -15,8 +15,6 @@
 void set_sinxcosy_tag(o::Mesh& mesh) {
     // get the bounding box of the mesh
     Omega_h::BBox<2> bb = Omega_h::get_bounding_box<2>(&mesh);
-    printf("Bounding box: min=(%f %f) max=(%f %f)\n", bb.min[0], bb.min[1],
-           bb.max[0], bb.max[1]);
     double dx = bb.max[0] - bb.min[0];
     double dy = bb.max[1] - bb.min[1];
 
@@ -34,6 +32,22 @@ void set_sinxcosy_tag(o::Mesh& mesh) {
 
     // add the tag to the mesh
     mesh.add_tag(o::VERT, "sinxcosy", 1, o::Reals(sinxcosytag));
+}
+
+void set_n_sq_tag(o::Mesh& mesh) {
+    o::BBox<2> bb = o::get_bounding_box<2>(&mesh);
+    double dx = bb.max[0] - bb.min[0];
+    double dy = bb.max[1] - bb.min[1];
+
+    auto nfaces = mesh.nfaces();
+    o::Write<o::Real> nSqTag(nfaces);
+
+    auto assign_n_sq = OMEGA_H_LAMBDA(o::LO face) {
+        nSqTag[face] = o::Real(face) * o::Real(face);
+    };
+    o::parallel_for(nfaces, assign_n_sq, "assign_n_sq");
+
+    mesh.add_tag(o::FACE, "n_sq", 1, o::Reals(nSqTag));
 }
 
 void node_average2cell(o::Mesh& mesh) {

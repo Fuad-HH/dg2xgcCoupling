@@ -7,6 +7,8 @@
 #include <pcms/types.h>
 #include <redev_partition.h>
 
+#include <Omega_h_defines.hpp>
+#include <Omega_h_fail.hpp>
 #include <Omega_h_file.hpp>
 #include <Omega_h_for.hpp>
 #include <Omega_h_library.hpp>
@@ -30,6 +32,7 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh) {
     auto* dummyXGCapp = cpl.AddApplication("xgcClient");
 
     o::Write<o::I8> is_overlap(mesh.nents(0), 1);
+    o::Write<o::I8> is_overlap_face(mesh.nfaces(), 1);
     auto xgc_field_adapter = pcms::OmegaHFieldAdapter<pcms::Real>(
         "node_values_from_xgc", mesh, is_overlap);
     auto* field_nodedegas2 = dummydegas2app->AddField(
@@ -49,6 +52,22 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh) {
     dummydegas2app->SendPhase(
         [&]() { field_nodedegas2->Send(pcms::Mode::Deferred); });
 
+    // now receive the face data from degas2
+    printf("Waiting for FACE data from degas2: Mask size = %d\n",
+           is_overlap_face.size());
+    auto degas2_face_field_adapter = pcms::OmegaHFieldAdapter<pcms::Real>(
+        "n_sq_from_degas2", mesh, is_overlap_face, "", 10, 10,
+        pcms::detail::mesh_entity_type::FACE);
+    printf("FACE Field adapter created\n");
+    auto* field_degas2_face = dummydegas2app->AddField(
+        "n_sq", degas2_face_field_adapter, pcms::FieldTransferMethod::Copy,
+        pcms::FieldEvaluationMethod::None, pcms::FieldTransferMethod::Copy,
+        pcms::FieldEvaluationMethod::None, is_overlap_face);
+    printf("FACE field added to coupler degas2 app\n");
+
+    dummydegas2app->ReceivePhase([&]() { field_degas2_face->Receive(); });
+    printf("FACE Data received from degas2\n");
+
     Omega_h::vtk::write_parallel("degas2 coupling", &mesh, mesh.dim());
 }
 
@@ -60,9 +79,14 @@ int main(int argc, char** argv) {
     }
     std::string input_mesh = argv[1];
     o::Mesh mesh = Omega_h::binary::read(input_mesh, library.self());
+    set_global_tag(mesh);
     o::Read<o::Real> data(mesh.nverts(), 0.0);
+    o::Reals data_face(mesh.nfaces(), 0.0);
+    OMEGA_H_CHECK(mesh.has_tag(o::FACE, "global"));
+    OMEGA_H_CHECK(mesh.has_tag(o::VERT, "global"));
     mesh.add_tag<o::Real>(0, "node_values_from_xgc", 1, data);
     mesh.add_tag<o::Real>(0, "node_values_from_degas2", 1, data);
+    mesh.add_tag<o::Real>(2, "n_sq_from_degas2", 1, data_face);
     printf("Mesh loaded with %d elements\n", mesh.nelems());
 
     MPI_Comm comm = MPI_COMM_WORLD;

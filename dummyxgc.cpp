@@ -24,6 +24,7 @@ int main(int argc, char* argv[]) {
     o::Mesh mesh = Omega_h::binary::read(input_mesh, library.self());
     printf("Mesh loaded in **xgc** with %d elements and %d nodes\n",
            mesh.nelems(), mesh.nverts());
+    set_global_tag(mesh);
     set_sinxcosy_tag(mesh);
 
     // check if it has the tag

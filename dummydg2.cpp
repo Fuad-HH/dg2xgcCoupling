@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
     o::Library library(&argc, &argv);
     o::Mesh mesh = Omega_h::binary::read(input_mesh, library.self());
     printf("Mesh loaded in **degas2** app with %d elements\n", mesh.nelems());
+    set_global_tag(mesh);
     o::Read<o::Real> data(mesh.nverts(), 0.0);
     mesh.add_tag<o::Real>(0, "sinxcosy", 1, data);
 
@@ -37,9 +38,14 @@ int main(int argc, char* argv[]) {
     set_n_sq_tag(mesh);
     if (!mesh.has_tag(o::FACE, "n_sq")) {
         printf("The mesh does not have the tag n_sq\n");
-    } else {
-        printf("The mesh has the tag n_sq\n");
     }
+
+    cpl.AddField("n_sq", pcms::OmegaHFieldAdapter<Omega_h::Real>(
+                             "n_sq", mesh, "", 10, 10,
+                             pcms::detail::mesh_entity_type::FACE));
+    cpl.BeginSendPhase();
+    cpl.SendField("n_sq");
+    cpl.EndSendPhase();
 
     // now check if the tag is received
     if (mesh.has_tag(o::VERT, "sinxcosy")) {

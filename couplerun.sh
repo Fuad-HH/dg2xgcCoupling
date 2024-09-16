@@ -17,9 +17,10 @@ kill_stuff() {
 
 
 run_stuff() {
-  mpirun -np 1 $1 /lore/hasanm4/wsources/pumipush/meshes/square.osh &
+  mpirun -np 1 $1 /lore/hasanm4/wsources/pumipush/meshes/LCPPcoarse.osh &
   PIDS+=($!)
 }
+#mpirun -np 1 $1 /lore/hasanm4/wsources/pumipush/meshes/square.osh &
 
 trap "kill_stuff" SIGINT
 

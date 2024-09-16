@@ -50,6 +50,24 @@ void set_n_sq_tag(o::Mesh& mesh) {
     mesh.add_tag(o::FACE, "n_sq", 1, o::Reals(nSqTag));
 }
 
+void set_global_tag(o::Mesh& mesh) {
+    if (!mesh.has_tag(o::VERT, "global")) {
+        o::Write<o::GO> globalTag(mesh.nverts());
+        o::parallel_for(
+            mesh.nverts(),
+            OMEGA_H_LAMBDA(o::GO node) { globalTag[node] = node; });
+        mesh.add_tag(o::VERT, "global", 1, o::GOs(globalTag));
+    }
+
+    if (!mesh.has_tag(o::FACE, "global")) {
+        o::Write<o::GO> globalTag(mesh.nfaces());
+        o::parallel_for(
+            mesh.nfaces(),
+            OMEGA_H_LAMBDA(o::GO face) { globalTag[face] = face; });
+        mesh.add_tag(o::FACE, "global", 1, o::GOs(globalTag));
+    }
+}
+
 void node_average2cell(o::Mesh& mesh) {
     auto sinxcosytag = mesh.get_array<o::Real>(o::VERT, "sinxcosy");
     auto face2node = mesh.ask_down(o::FACE, o::VERT).ab2b;

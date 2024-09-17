@@ -20,11 +20,15 @@ run_stuff() {
   mpirun -np 1 $1 /lore/hasanm4/wsources/pumipush/meshes/LCPPcoarse.osh &
   PIDS+=($!)
 }
+run_coupler() {
+  mpirun -np 1 $1 /lore/hasanm4/wsources/pumipush/meshes/LCPPcoarse.osh 0.03 &
+  PIDS+=($!)
+}
 #mpirun -np 1 $1 /lore/hasanm4/wsources/pumipush/meshes/square.osh &
 
 trap "kill_stuff" SIGINT
 
-run_stuff ../build/dg2xgcCoupler 
+run_coupler ../build/dg2xgcCoupler 
 run_stuff ../build/dummyxgc 
 run_stuff ../build/dummydg2
 

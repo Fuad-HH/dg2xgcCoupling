@@ -7,6 +7,7 @@
 #include <pcms/types.h>
 #include <redev_partition.h>
 
+#include <Omega_h_build.hpp>
 #include <Omega_h_defines.hpp>
 #include <Omega_h_fail.hpp>
 #include <Omega_h_file.hpp>
@@ -19,7 +20,8 @@
 
 #include "node2cell.hpp"
 
-void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh) {
+void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
+                     o::Real interpolation_radius) {
     printf("Running omega_h_coupler... \n");
     std::vector<pcms::LO> ranks{0};
     std::vector<pcms::Real> cuts = {0};
@@ -68,19 +70,28 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh) {
     dummydegas2app->ReceivePhase([&]() { field_degas2_face->Receive(); });
     printf("FACE Data received from degas2\n");
 
-    cell2node(mesh, "n_sq_from_degas2", "node_sinxcosy_derived", 0.015);
+    cell2node(mesh, "n_sq_from_degas2", "node_sinxcosy_derived",
+              interpolation_radius);
 
     Omega_h::vtk::write_parallel("degas2 coupling", &mesh, mesh.dim());
 }
 
 int main(int argc, char** argv) {
     o::Library library(&argc, &argv);
-    if (argc != 2) {
-        std::cout << "Usage: " << argv[0] << " <input mesh>\n";
+    if (argc != 3) {
+        std::cout << "Usage: " << argv[0]
+                  << " <input mesh> <interpolation radius>\n";
         return -1;
     }
     std::string input_mesh = argv[1];
-    o::Mesh mesh = Omega_h::binary::read(input_mesh, library.self());
+    o::Real interpolation_radius = std::stod(argv[2]);
+    o::Mesh mesh;
+    if (input_mesh == std::string("internal_box")) {
+        mesh = o::build_box(library.world(), OMEGA_H_SIMPLEX, 1, 1, 1, 100, 100,
+                            0, false);
+    } else {
+        mesh = o::binary::read(input_mesh, library.self());
+    }
     set_global_tag(mesh);
     o::Read<o::Real> data(mesh.nverts(), 0.0);
     o::Reals data_face(mesh.nfaces(), 0.0);
@@ -92,7 +103,7 @@ int main(int argc, char** argv) {
     printf("Mesh loaded with %d elements\n", mesh.nelems());
 
     MPI_Comm comm = MPI_COMM_WORLD;
-    omega_h_coupler(comm, mesh);
+    omega_h_coupler(comm, mesh, interpolation_radius);
 
     return 0;
 }

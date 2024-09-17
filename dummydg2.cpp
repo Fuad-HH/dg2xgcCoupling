@@ -10,6 +10,7 @@ sent by the coupler which it got from xgc.
 #include <pcms/omega_h_field.h>
 #include <pcms/pcms.h>
 
+#include <Omega_h_build.hpp>
 #include <Omega_h_defines.hpp>
 #include <Omega_h_file.hpp>
 #include <Omega_h_for.hpp>
@@ -28,7 +29,13 @@ int main(int argc, char* argv[]) {
     std::string input_mesh = argv[1];
 
     o::Library library(&argc, &argv);
-    o::Mesh mesh = Omega_h::binary::read(input_mesh, library.self());
+    o::Mesh mesh;
+    if (input_mesh == std::string("internal_box")) {
+        mesh = o::build_box(library.world(), OMEGA_H_SIMPLEX, 1, 1, 1, 100, 100,
+                            0, false);
+    } else {
+        mesh = o::binary::read(input_mesh, library.self());
+    }
     printf("Mesh loaded in **degas2** app with %d elements\n", mesh.nelems());
     set_global_tag(mesh);
     o::Read<o::Real> data(mesh.nverts(), 0.0);

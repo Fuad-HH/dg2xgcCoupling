@@ -68,6 +68,8 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh) {
     dummydegas2app->ReceivePhase([&]() { field_degas2_face->Receive(); });
     printf("FACE Data received from degas2\n");
 
+    cell2node(mesh, "n_sq_from_degas2", "node_sinxcosy_derived", 0.015);
+
     Omega_h::vtk::write_parallel("degas2 coupling", &mesh, mesh.dim());
 }
 

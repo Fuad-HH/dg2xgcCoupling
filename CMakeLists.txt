@@ -10,10 +10,12 @@ find_package(Omega_h REQUIRED)
 message(STATUS "Omega_h found at ${Omega_h_DIR}")
 find_package(MPI REQUIRED)
 find_package(pcms REQUIRED)
+find_package(interpolator REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -G")
 
 # create lib with node2cell.cpp and .hpp
 add_library(node2cell_lib node2cell.cpp node2cell.hpp)
-target_link_libraries(node2cell_lib PUBLIC Omega_h::omega_h MPI::MPI_CXX pcms::pcms)
+target_link_libraries(node2cell_lib PUBLIC Omega_h::omega_h MPI::MPI_CXX pcms::pcms interpolator::interpolator)
 
 add_executable(node2cell main.cpp)
 target_link_libraries(node2cell PRIVATE node2cell_lib)

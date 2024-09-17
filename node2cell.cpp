@@ -1,16 +1,50 @@
 #include "node2cell.hpp"
 
+#include <Omega_h_macros.h>
 #include <pcms/pcms.h>
 
+#include <MLSInterpolation.hpp>
 #include <Omega_h_adj.hpp>
 #include <Omega_h_array.hpp>
 #include <Omega_h_bbox.hpp>
+#include <Omega_h_defines.hpp>
 #include <Omega_h_file.hpp>
 #include <Omega_h_for.hpp>
 #include <Omega_h_matrix.hpp>
 #include <Omega_h_mesh.hpp>
 #include <Omega_h_shape.hpp>
 #include <Omega_h_vector.hpp>
+#include <string>
+// #include <adj_search_deg.hpp>
+#include <adj_search_dega2.hpp>
+#include <points.hpp>
+
+void cell2node(o::Mesh& mesh, const std::string field_name,
+               const std::string new_field_name, o::Real radius) {
+    o::Real radius_sq = radius * radius;
+    auto coords = mesh.coords();
+    o::Write<o::Real> source_locations(mesh.nfaces() * 2, 0.0);
+
+    auto face2node = mesh.ask_down(o::FACE, o::VERT).ab2b;
+    o::parallel_for(
+        mesh.nfaces(), OMEGA_H_LAMBDA(o::LO face) {
+            auto nodes = o::gather_verts<3>(face2node, face);
+            o::Few<o::Vector<2>, 3> face_coords =
+                o::gather_vectors<3, 2>(coords, nodes);
+            o::Vector<2> centroid = o::average(face_coords);
+            source_locations[2 * face + 0] = centroid[0];
+            source_locations[2 * face + 1] = centroid[1];
+        });
+
+    SupportResults support = searchNeighbors(mesh, radius_sq);
+    o::Reals field = mesh.get_array<o::Real>(2, field_name);
+    auto interpolated_values = mls_interpolation(field, source_locations,
+                                                 coords, support, 2, radius_sq);
+    printf("Interpolated values size: %d\n", interpolated_values.size());
+    printf("Number of vertex nodes: %d\n", mesh.nverts());
+    mesh.add_tag<o::Real>(o::VERT, new_field_name, 1,
+                          o::Reals(interpolated_values));
+}
 
 void set_sinxcosy_tag(o::Mesh& mesh) {
     // get the bounding box of the mesh

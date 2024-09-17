@@ -1,3 +1,10 @@
+/************************ File Description ******************************
+* Brief: This the dummy degas2 app that demonstrates how to use the PCMS library
+*        to couple two applications.
+* Functionality: It creates a data that lives on the mesh faces (as face tags)
+                 and sends the data to the coupler. I also receives the data
+sent by the coupler which it got from xgc.
+**************************************************************************/
 #include <mpi.h>
 #include <pcms/client.h>
 #include <pcms/omega_h_field.h>
@@ -25,7 +32,9 @@ int main(int argc, char* argv[]) {
     printf("Mesh loaded in **degas2** app with %d elements\n", mesh.nelems());
     set_global_tag(mesh);
     o::Read<o::Real> data(mesh.nverts(), 0.0);
-    mesh.add_tag<o::Real>(0, "sinxcosy", 1, data);
+    // mesh.add_tag<o::Real>(0, "sinxcosy", 1, data);
+    set_sinxcosy_tag(mesh);
+    node_average2cell(mesh);
 
     pcms::CouplerClient cpl("degas2Client", MPI_COMM_WORLD);
     cpl.AddField("sincos",
@@ -41,7 +50,7 @@ int main(int argc, char* argv[]) {
     }
 
     cpl.AddField("n_sq", pcms::OmegaHFieldAdapter<Omega_h::Real>(
-                             "n_sq", mesh, "", 10, 10,
+                             "sinxcosy", mesh, "", 10, 10,
                              pcms::detail::mesh_entity_type::FACE));
     cpl.BeginSendPhase();
     cpl.SendField("n_sq");

@@ -59,7 +59,7 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
            is_overlap_face.size());
     auto degas2_face_field_adapter = pcms::OmegaHFieldAdapter<pcms::Real>(
         "n_sq_from_degas2", mesh, is_overlap_face, "", 10, 10,
-        pcms::detail::mesh_entity_type::FACE);
+        pcms::mesh_entity_type::FACE);
     printf("FACE Field adapter created\n");
     auto* field_degas2_face = dummydegas2app->AddField(
         "n_sq", degas2_face_field_adapter, pcms::FieldTransferMethod::Copy,

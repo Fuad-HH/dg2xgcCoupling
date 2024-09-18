@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
 
     cpl.AddField("n_sq", pcms::OmegaHFieldAdapter<Omega_h::Real>(
                              "sinxcosy", mesh, "", 10, 10,
-                             pcms::detail::mesh_entity_type::FACE));
+                             pcms::mesh_entity_type::FACE));
     cpl.BeginSendPhase();
     cpl.SendField("n_sq");
     cpl.EndSendPhase();

@@ -44,6 +44,14 @@ void cell2node(o::Mesh& mesh, const std::string field_name,
     printf("Number of vertex nodes: %d\n", mesh.nverts());
     mesh.add_tag<o::Real>(o::VERT, new_field_name, 1,
                           o::Reals(interpolated_values));
+
+    o::Write<o::LO> num_supports(mesh.nverts(), -1);
+    o::parallel_for(
+        mesh.nverts(), OMEGA_H_LAMBDA(o::LO node) {
+            num_supports[node] =
+                support.supports_ptr[node + 1] - support.supports_ptr[node];
+        });
+    mesh.add_tag<o::LO>(o::VERT, "num_supports", 1, o::LOs(num_supports));
 }
 
 void set_sinxcosy_tag(o::Mesh& mesh) {

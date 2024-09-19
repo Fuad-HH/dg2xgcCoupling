@@ -73,7 +73,14 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
     cell2node(mesh, "n_sq_from_degas2", "node_sinxcosy_derived",
               interpolation_radius);
 
-    Omega_h::vtk::write_parallel("degas2 coupling", &mesh, mesh.dim());
+    set_sinxcosy_tag(mesh);
+
+    o::Real l2_norm =
+        calculate_l2_error(mesh, "node_sinxcosy_derived", "sinxcosy");
+    printf("L2 norm of the error: %f\n", l2_norm);
+
+    Omega_h::vtk::write_parallel("degas2_coupling_result.vtk", &mesh,
+                                 mesh.dim());
 }
 
 int main(int argc, char** argv) {

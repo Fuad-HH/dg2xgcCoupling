@@ -12,12 +12,33 @@
 #include <Omega_h_for.hpp>
 #include <Omega_h_matrix.hpp>
 #include <Omega_h_mesh.hpp>
+#include <Omega_h_reduce.hpp>
 #include <Omega_h_shape.hpp>
 #include <Omega_h_vector.hpp>
 #include <string>
 // #include <adj_search_deg.hpp>
 #include <adj_search_dega2.hpp>
 #include <points.hpp>
+
+o::Real calculate_l2_error(o::Mesh& mesh, std::string apporx_field_name,
+                           std::string exact_field_name) {
+    auto approx_field = mesh.get_array<o::Real>(o::VERT, apporx_field_name);
+    auto exact_field = mesh.get_array<o::Real>(o::VERT, exact_field_name);
+
+    o::Real l2_error = 0.0;
+
+    Kokkos::parallel_reduce(
+        Kokkos::RangePolicy<>(0, exact_field.size()),
+        KOKKOS_LAMBDA(const LO node_id, o::Real& l2) {
+            o::Real diff = approx_field[node_id] - exact_field[node_id];
+            l2 += diff * diff;
+        },
+        Kokkos::Sum<o::Real>(l2_error));
+
+    l2_error = Kokkos::sqrt(l2_error) / exact_field.size();
+
+    return l2_error;
+}
 
 void cell2node(o::Mesh& mesh, const std::string field_name,
                const std::string new_field_name, o::Real radius) {
@@ -38,8 +59,8 @@ void cell2node(o::Mesh& mesh, const std::string field_name,
 
     SupportResults support = searchNeighbors(mesh, radius_sq);
     o::Reals field = mesh.get_array<o::Real>(2, field_name);
-    auto interpolated_values = mls_interpolation(field, source_locations,
-                                                 coords, support, 2, radius_sq);
+    auto interpolated_values = mls_interpolation(
+        field, source_locations, coords, support, 2, support.radii2);
     printf("Interpolated values size: %d\n", interpolated_values.size());
     printf("Number of vertex nodes: %d\n", mesh.nverts());
     mesh.add_tag<o::Real>(o::VERT, new_field_name, 1,
@@ -68,7 +89,7 @@ void set_sinxcosy_tag(o::Mesh& mesh) {
     auto assignSinCos = OMEGA_H_LAMBDA(int node) {
         auto x = (coords[2 * node + 0] - bb.min[0]) / dx * 2.0 * M_PI;
         auto y = (coords[2 * node + 1] - bb.min[1]) / dy * 2.0 * M_PI;
-        sinxcosytag[node] = sin(x) * cos(y);
+        sinxcosytag[node] = 2 + sin(x) * cos(y);
     };
     o::parallel_for(nnodes, assignSinCos, "assignSinCos");
 

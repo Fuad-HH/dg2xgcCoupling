@@ -16,3 +16,6 @@ void set_global_tag(o::Mesh& mesh);
 
 void cell2node(o::Mesh& mesh, std::string field_name,
                std::string new_field_name, o::Real radius);
+
+o::Real calculate_l2_error(o::Mesh& mesh, std::string apporx_field_name,
+                           std::string exact_field_name);

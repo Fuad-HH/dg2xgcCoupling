@@ -40,6 +40,27 @@ o::Real calculate_l2_error(o::Mesh& mesh, std::string apporx_field_name,
     return l2_error;
 }
 
+o::Real calculate_rel_l2_error(o::Mesh& mesh, std::string apporx_field_name,
+                               std::string exact_field_name) {
+    auto approx_field = mesh.get_array<o::Real>(o::VERT, apporx_field_name);
+    auto exact_field = mesh.get_array<o::Real>(o::VERT, exact_field_name);
+
+    o::Real l2_error = 0.0;
+
+    Kokkos::parallel_reduce(
+        Kokkos::RangePolicy<>(0, exact_field.size()),
+        KOKKOS_LAMBDA(const LO node_id, o::Real& l2) {
+            o::Real diff = approx_field[node_id] - exact_field[node_id];
+            diff = diff / exact_field[node_id];
+            l2 += diff * diff;
+        },
+        Kokkos::Sum<o::Real>(l2_error));
+
+    l2_error = Kokkos::sqrt(l2_error) / exact_field.size();
+
+    return l2_error;
+}
+
 void cell2node(o::Mesh& mesh, const std::string field_name,
                const std::string new_field_name, o::Real radius) {
     o::Real radius_sq = radius * radius;
@@ -147,6 +168,25 @@ void node_average2cell(o::Mesh& mesh) {
     o::parallel_for(nfaces, averageSinCos, "averageSinCos");
 
     mesh.add_tag(o::FACE, "sinxcosy", 1, o::Reals(sinxcosyCell));
+}
+
+void node2cell(o::Mesh& mesh, std::string node_field_name,
+               std::string face_field_name) {
+    auto node_field = mesh.get_array<o::Real>(o::VERT, node_field_name);
+    auto face2node = mesh.ask_down(o::FACE, o::VERT).ab2b;
+    auto coords = mesh.coords();
+    o::LO nfaces = mesh.nfaces();
+    o::Write<o::Real> faceField(nfaces);
+
+    auto averageField = OMEGA_H_LAMBDA(o::LO face) {
+        auto faceNodes = o::gather_verts<3>(face2node, face);
+        o::Real sum = node_field[faceNodes[0]] + node_field[faceNodes[1]] +
+                      node_field[faceNodes[2]];
+        faceField[face] = sum / 3.0;
+    };
+    o::parallel_for(nfaces, averageField, "averageField");
+
+    mesh.add_tag(o::FACE, face_field_name, 1, o::Reals(faceField));
 }
 
 void render(o::Mesh& mesh, int iter, int comm_rank) {

@@ -1,4 +1,3 @@
-#include <mpi.h>
 #include <pcms/field_evaluation_methods.h>
 #include <pcms/omega_h_field.h>
 #include <pcms/pcms.h>
@@ -14,7 +13,9 @@
 #include <Omega_h_for.hpp>
 #include <Omega_h_library.hpp>
 #include <Omega_h_mesh.hpp>
+#include <chrono>
 #include <iostream>
+#include <ratio>
 #include <string>
 #include <vector>
 
@@ -78,6 +79,74 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
     o::Real l2_norm =
         calculate_l2_error(mesh, "node_sinxcosy_derived", "sinxcosy");
     printf("L2 norm of the error: %f\n", l2_norm);
+
+    {
+        // loop over several times to test the l2 norm change and performance
+        auto start = std::chrono::steady_clock::now();
+        o::Real total_time = 0.0;
+        o::Real total_node2cell_time = 0.0;
+        o::Real total_cell2node_time = 0.0;
+
+        int num_iter = 10;
+        o::Real l2_norms[num_iter];
+        o::Real rel_l2_norms[num_iter];
+        for (int iter = 1; iter <= num_iter; iter++) {
+            std::string node_field_name;
+            if (iter == 1) {
+                node_field_name = "node_sinxcosy_derived";
+            } else {
+                node_field_name =
+                    "node_sinxcosy_derived_" + std::to_string(iter);
+            }
+            std::string face_field_name =
+                "face_n_sq_derived_" + std::to_string(iter);
+            std::string next_node_field_name =
+                "node_sinxcosy_derived_" + std::to_string(iter + 1);
+
+            auto start_node2cell = std::chrono::steady_clock::now();
+            node2cell(mesh, node_field_name, face_field_name);
+            auto end_node2cell = std::chrono::steady_clock::now();
+            total_node2cell_time += std::chrono::duration<o::Real, std::milli>(
+                                        end_node2cell - start_node2cell)
+                                        .count();
+
+            auto start_cell2node = std::chrono::steady_clock::now();
+            cell2node(mesh, face_field_name, next_node_field_name,
+                      interpolation_radius);
+            auto end_cell2node = std::chrono::steady_clock::now();
+            total_cell2node_time += std::chrono::duration<o::Real, std::milli>(
+                                        end_cell2node - start_cell2node)
+                                        .count();
+
+            l2_norms[iter - 1] =
+                calculate_l2_error(mesh, next_node_field_name, "sinxcosy");
+            rel_l2_norms[iter - 1] =
+                calculate_rel_l2_error(mesh, next_node_field_name, "sinxcosy");
+        }
+        auto end = std::chrono::steady_clock::now();
+        total_time =
+            std::chrono::duration<o::Real, std::milli>(end - start).count();
+
+        printf("----------Timing Info----------\n");
+        printf("Total time: %f ms\n", total_time);
+        printf("Total node2cell time: %f ms\n", total_node2cell_time);
+        printf("Average node2cell time: %f ms\n",
+               total_node2cell_time / num_iter);
+        printf("Total cell2node time: %f ms\n", total_cell2node_time);
+        printf("Average cell2node time: %f ms\n",
+               total_cell2node_time / num_iter);
+
+        printf("\n----------L2 Norms----------\n");
+        printf("Abs L2 norms: \n");
+        for (int i = 0; i < num_iter; i++) {
+            printf(" ,%.10f", l2_norms[i]);
+        }
+        printf("\nRel L2 norms: \n");
+        for (int i = 0; i < num_iter; i++) {
+            printf(" ,%.10f", rel_l2_norms[i]);
+        }
+        printf("\n");
+    }
 
     Omega_h::vtk::write_parallel("degas2_coupling_result.vtk", &mesh,
                                  mesh.dim());

@@ -90,6 +90,7 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
         int num_iter = 10;
         o::Real l2_norms[num_iter];
         o::Real rel_l2_norms[num_iter];
+        o::Real face_field_integral[num_iter];
         for (int iter = 1; iter <= num_iter; iter++) {
             std::string node_field_name;
             if (iter == 1) {
@@ -110,6 +111,9 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
                                         end_node2cell - start_node2cell)
                                         .count();
 
+            face_field_integral[iter - 1] =
+                get_face_field_integral(mesh, face_field_name);
+
             auto start_cell2node = std::chrono::steady_clock::now();
             cell2node(mesh, face_field_name, next_node_field_name,
                       interpolation_radius);
@@ -122,6 +126,11 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
                 calculate_l2_error(mesh, next_node_field_name, "sinxcosy");
             rel_l2_norms[iter - 1] =
                 calculate_rel_l2_error(mesh, next_node_field_name, "sinxcosy");
+
+            printf(
+                "-------------------------- Iteration %d "
+                "--------------------------\n",
+                iter);
         }
         auto end = std::chrono::steady_clock::now();
         total_time =
@@ -146,6 +155,11 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
             printf(" ,%.10f", rel_l2_norms[i]);
         }
         printf("\n");
+
+        printf("\n----------Face Field Integrals----------\n");
+        for (int i = 0; i < num_iter; i++) {
+            printf(" ,%.10f", face_field_integral[i]);
+        }
     }
 
     Omega_h::vtk::write_parallel("degas2_coupling_result.vtk", &mesh,
@@ -161,6 +175,8 @@ int main(int argc, char** argv) {
     }
     std::string input_mesh = argv[1];
     o::Real interpolation_radius = std::stod(argv[2]);
+    printf("Input mesh: %s\n", input_mesh.c_str());
+    printf("Interpolation radius: %f\n", interpolation_radius);
     o::Mesh mesh;
     if (input_mesh == std::string("internal_box")) {
         mesh = o::build_box(library.world(), OMEGA_H_SIMPLEX, 1, 1, 1, 100, 100,

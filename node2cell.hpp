@@ -1,6 +1,8 @@
 #pragma once
 
+#include <Omega_h_defines.hpp>
 #include <Omega_h_mesh.hpp>
+#include <Omega_h_shape.hpp>
 
 namespace o = Omega_h;
 
@@ -25,3 +27,13 @@ o::Real calculate_l2_error(o::Mesh& mesh, std::string apporx_field_name,
 
 o::Real calculate_rel_l2_error(o::Mesh& mesh, std::string apporx_field_name,
                                std::string exact_field_name);
+
+o::Real get_face_field_integral(o::Mesh& mesh, const std::string field_name);
+
+OMEGA_H_DEVICE
+o::Real area_tri(const o::Few<o::Vector<2>, 3>& tri_verts) {
+    o::Few<o::Vector<2>, 2> basis22 = {tri_verts[1] - tri_verts[0],
+                                       tri_verts[2] - tri_verts[0]};
+    auto area = o::triangle_area_from_basis(basis22);
+    return area;
+}

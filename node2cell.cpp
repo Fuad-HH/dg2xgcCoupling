@@ -3,11 +3,11 @@
 #include <Omega_h_macros.h>
 #include <pcms/pcms.h>
 
-#include <MLSInterpolation.hpp>
 #include <Omega_h_adj.hpp>
 #include <Omega_h_array.hpp>
 #include <Omega_h_bbox.hpp>
 #include <Omega_h_defines.hpp>
+#include <Omega_h_fail.hpp>
 #include <Omega_h_file.hpp>
 #include <Omega_h_for.hpp>
 #include <Omega_h_matrix.hpp>
@@ -15,10 +15,9 @@
 #include <Omega_h_reduce.hpp>
 #include <Omega_h_shape.hpp>
 #include <Omega_h_vector.hpp>
+#include <pcms/interpolator/MLSInterpolation.hpp>
+#include <pcms/interpolator/adj_search_dega2.hpp>
 #include <string>
-// #include <adj_search_deg.hpp>
-#include <adj_search_dega2.hpp>
-#include <points.hpp>
 
 o::Real calculate_l2_error(o::Mesh& mesh, std::string apporx_field_name,
                            std::string exact_field_name) {
@@ -194,4 +193,36 @@ void render(o::Mesh& mesh, int iter, int comm_rank) {
     ss << "coupled_mesh" << iter << "_r" << comm_rank << ".vtk";
     std::string s = ss.str();
     o::vtk::write_parallel(s, &mesh, mesh.dim());
+}
+
+o::Real get_face_field_integral(o::Mesh& mesh, const std::string field_name) {
+    OMEGA_H_CHECK(mesh.has_tag(o::FACE, field_name));
+    const auto coords = mesh.coords();
+    const auto faces2nodes = mesh.ask_down(o::FACE, o::VERT).ab2b;
+    const auto n_faces = mesh.nfaces();
+    o::Real total_area = 0.0;
+    o::Write<o::Real> face_areas(n_faces);
+
+    Kokkos::parallel_reduce(
+        Kokkos::RangePolicy<>(0, n_faces),
+        KOKKOS_LAMBDA(const int i, o::Real& local_area) {
+            auto face_nodes = o::gather_verts<3>(faces2nodes, i);
+            o::Few<o::Vector<2>, 3> face_coords;
+            face_coords = o::gather_vectors<3, 2>(coords, face_nodes);
+            o::Real face_area = area_tri(face_coords);
+            face_areas[i] = face_area;
+            local_area += face_area;
+        },
+        Kokkos::Sum<o::Real>(total_area));
+
+    auto face_field = mesh.get_array<o::Real>(o::FACE, field_name);
+    o::Real field_integral = 0.0;
+    Kokkos::parallel_reduce(
+        Kokkos::RangePolicy<>(0, n_faces),
+        KOKKOS_LAMBDA(const int i, o::Real& local_integral) {
+            local_integral += face_field[i] * (face_areas[i]);
+        },
+        Kokkos::Sum<o::Real>(field_integral));
+
+    return field_integral;
 }

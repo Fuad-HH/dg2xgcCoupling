@@ -6,6 +6,7 @@
 #include <pcms/types.h>
 #include <redev_partition.h>
 
+#include <Omega_h_array.hpp>
 #include <Omega_h_build.hpp>
 #include <Omega_h_defines.hpp>
 #include <Omega_h_fail.hpp>
@@ -71,14 +72,13 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
     dummydegas2app->ReceivePhase([&]() { field_degas2_face->Receive(); });
     printf("FACE Data received from degas2\n");
 
-    cell2node(mesh, "n_sq_from_degas2", "node_sinxcosy_derived",
-              interpolation_radius);
+    bool using_degas2_data = false;
+    if (!using_degas2_data) {
+        cell2node(mesh, "n_sq_from_degas2", "node_sinxcosy_derived",
+                  interpolation_radius);
 
-    set_sinxcosy_tag(mesh);
-
-    o::Real l2_norm =
-        calculate_l2_error(mesh, "node_sinxcosy_derived", "sinxcosy");
-    printf("L2 norm of the error: %f\n", l2_norm);
+        set_sinxcosy_tag(mesh);
+    }
 
     {
         // loop over several times to test the l2 norm change and performance
@@ -87,10 +87,35 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
         o::Real total_node2cell_time = 0.0;
         o::Real total_cell2node_time = 0.0;
 
+        std::string exact_face_field_name = "n_sq_from_degas2";
+        std::string exact_node_field_name = "sinxcosy";
+
+        if (using_degas2_data) {
+            // read the data from file
+            o::Reals density_xgc = read_field_from_file(
+                "/lore/hasanm4/wsources/meshes/xgcm_one_plane_output/plane_1/"
+                "ghost_planes/idensity.csv");
+            OMEGA_H_CHECK(density_xgc.size() == mesh.nverts());
+            auto sorted_density_xgc = sort_field(
+                density_xgc,
+                "/lore/hasanm4/wsources/meshes/xgcm_one_plane_output/plane_1/"
+                "ghost_planes/simNumbering.csv");
+            mesh.add_tag<o::Real>(0, "node_sinxcosy_derived", 1,
+                                  sorted_density_xgc);
+            node2cell(mesh, "node_sinxcosy_derived", "exact_face_field");
+            exact_face_field_name = "exact_face_field";
+            exact_node_field_name = "node_sinxcosy_derived";
+        }
+
         int num_iter = 10;
         o::Real l2_norms[num_iter];
+        o::Real l1_norms[num_iter];
+        o::Real int_l2_norms[num_iter];
         o::Real rel_l2_norms[num_iter];
         o::Real face_field_integral[num_iter];
+        // o::LOs l_inf_locs {273773, 275797, 769745, 271800, 273859};
+        o::LOs l_inf_locs{0, 1, 2, 3, 4};
+        o::Real l_inf_values[10][5];
         for (int iter = 1; iter <= num_iter; iter++) {
             std::string node_field_name;
             if (iter == 1) {
@@ -117,15 +142,29 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
             auto start_cell2node = std::chrono::steady_clock::now();
             cell2node(mesh, face_field_name, next_node_field_name,
                       interpolation_radius);
+            // cell2node_degas2_style(mesh, face_field_name,
+            // next_node_field_name);
             auto end_cell2node = std::chrono::steady_clock::now();
             total_cell2node_time += std::chrono::duration<o::Real, std::milli>(
                                         end_cell2node - start_cell2node)
                                         .count();
 
-            l2_norms[iter - 1] =
-                calculate_l2_error(mesh, next_node_field_name, "sinxcosy");
-            rel_l2_norms[iter - 1] =
-                calculate_rel_l2_error(mesh, next_node_field_name, "sinxcosy");
+            l2_norms[iter - 1] = calculate_l2_error(mesh, next_node_field_name,
+                                                    exact_node_field_name);
+            l1_norms[iter - 1] = calculate_l1_error(mesh, next_node_field_name,
+                                                    exact_node_field_name);
+            int_l2_norms[iter - 1] = calculate_integral_l2_error(
+                mesh, face_field_name, exact_face_field_name);
+            rel_l2_norms[iter - 1] = calculate_rel_l2_error(
+                mesh, next_node_field_name, exact_node_field_name);
+
+            auto l_inf_error = get_l_inf_error(
+                mesh, next_node_field_name, exact_node_field_name, l_inf_locs);
+            o::HostRead<o::Real> l_inf_error_host(l_inf_error);
+            // save the l_inf error values in l_int_values
+            for (int i = 0; i < l_inf_locs.size(); i++) {
+                l_inf_values[iter - 1][i] = l_inf_error_host[i];
+            }
 
             printf(
                 "-------------------------- Iteration %d "
@@ -150,6 +189,10 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
         for (int i = 0; i < num_iter; i++) {
             printf(" ,%.10f", l2_norms[i]);
         }
+        printf("\n-----------------l1 Norms-----------------\n");
+        for (int i = 0; i < num_iter; i++) {
+            printf(" ,%.10f", l1_norms[i]);
+        }
         printf("\nRel L2 norms: \n");
         for (int i = 0; i < num_iter; i++) {
             printf(" ,%.10f", rel_l2_norms[i]);
@@ -159,6 +202,20 @@ void omega_h_coupler(MPI_Comm comm, o::Mesh& mesh,
         printf("\n----------Face Field Integrals----------\n");
         for (int i = 0; i < num_iter; i++) {
             printf(" ,%.10f", face_field_integral[i]);
+        }
+
+        printf("\n----------Integral L2 Norms----------\n");
+        for (int i = 0; i < num_iter; i++) {
+            printf(" ,%.10f", int_l2_norms[i]);
+        }
+
+        printf("\n----------L_inf Norms----------\n");
+        // as a list of lists
+        for (int i = 0; i < num_iter; i++) {
+            for (int j = 0; j < l_inf_locs.size(); j++) {
+                printf(" ,%.10f", l_inf_values[i][j]);
+            }
+            printf("\n");
         }
     }
 
@@ -193,6 +250,7 @@ int main(int argc, char** argv) {
     mesh.add_tag<o::Real>(0, "node_values_from_degas2", 1, data);
     mesh.add_tag<o::Real>(2, "n_sq_from_degas2", 1, data_face);
     printf("Mesh loaded with %d elements\n", mesh.nelems());
+    compute_cell_area_tag(mesh);
 
     MPI_Comm comm = MPI_COMM_WORLD;
     omega_h_coupler(comm, mesh, interpolation_radius);

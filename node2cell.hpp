@@ -25,6 +25,9 @@ void cell2node(o::Mesh& mesh, std::string field_name,
 o::Real calculate_l2_error(o::Mesh& mesh, std::string apporx_field_name,
                            std::string exact_field_name);
 
+o::Real calculate_l1_error(o::Mesh& mesh, std::string apporx_field_name,
+                           std::string exact_field_name);
+
 o::Real calculate_rel_l2_error(o::Mesh& mesh, std::string apporx_field_name,
                                std::string exact_field_name);
 
@@ -37,3 +40,23 @@ o::Real area_tri(const o::Few<o::Vector<2>, 3>& tri_verts) {
     auto area = o::triangle_area_from_basis(basis22);
     return area;
 }
+
+o::Real calculate_integral_l2_error(o::Mesh& mesh,
+                                    std::string approx_field_name,
+                                    std::string exact_field_name);
+
+o::Reals get_l_inf_error(o::Mesh& mesh, std::string approx_field_name,
+                         std::string exact_field_name, o::LOs ids);
+
+o::Reals read_field_from_file(std::string file_name);
+
+void cell2node_degas2_style(o::Mesh& mesh, const std::string face_field_name,
+                            const std::string new_field_name);
+
+o::Reals sort_field(o::Reals field, std::string simNumbering_file);
+
+void compute_cell_area_tag(o::Mesh& mesh);
+
+void cell2node_degas2_style_area_weighted(o::Mesh& mesh,
+                                          const std::string face_field_name,
+                                          const std::string new_field_name);

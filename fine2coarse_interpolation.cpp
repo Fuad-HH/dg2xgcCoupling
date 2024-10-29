@@ -1,3 +1,5 @@
+#include <Omega_h_build.hpp>
+#include <Omega_h_fail.hpp>
 #include <Omega_h_file.hpp>
 #include <pcms/interpolator/MLSInterpolation.hpp>
 #include <pcms/interpolator/adj_search.hpp>
@@ -35,14 +37,29 @@ int main(int argc, char** argv) {
     }
     std::string source_mesh_fname = argv[1];
     std::string target_mesh_fname = argv[2];
+    if (source_mesh_fname == "internal" || target_mesh_fname == "internal") {
+        OMEGA_H_CHECK_PRINTF(target_mesh_fname == source_mesh_fname,
+                             "Both meshes must be internal but got %s and %s\n",
+                             target_mesh_fname.c_str(),
+                             source_mesh_fname.c_str());
+    }
     o::Real interpolation_radius = std::stod(argv[3]);
 
     printf("Source mesh: %s\n", source_mesh_fname.c_str());
     printf("Target mesh: %s\n", target_mesh_fname.c_str());
     printf("Interpolation radius: %f\n", interpolation_radius);
 
-    o::Mesh source_mesh = o::binary::read(source_mesh_fname, library.self());
-    o::Mesh target_mesh = o::binary::read(target_mesh_fname, library.self());
+    o::Mesh source_mesh;
+    o::Mesh target_mesh;
+    if (source_mesh_fname != "internal") {
+        source_mesh = o::binary::read(source_mesh_fname, library.self());
+        target_mesh = o::binary::read(target_mesh_fname, library.self());
+    } else {
+        source_mesh = o::build_box(library.world(), OMEGA_H_SIMPLEX, 1, 1, 1,
+                                   100, 100, 0, false);
+        target_mesh = o::build_box(library.world(), OMEGA_H_SIMPLEX, 1, 1, 1,
+                                   50, 50, 0, false);
+    }
 
     printf("________________ Mesh Loaded ________________\n");
     printf("Source mesh has %d vertices and %d elements\n",
@@ -66,9 +83,10 @@ int main(int argc, char** argv) {
     o::Read<o::Real> radii2(target_mesh.nverts(), radius2, "radii2");
 
     printf("________________ MLS Interpolation ________________\n");
-    SupportResults support = searchNeighbors(source_mesh, target_mesh, radius2);
+    SupportResults support =
+        searchNeighbors(source_mesh, target_mesh, radius2, 12, false);
     auto approx_target_values = mls_interpolation(
-        source_values, source_coords, tartget_coords, support, 2, 1, radius2);
+        source_values, source_coords, tartget_coords, support, 2, 2, radius2);
     printf("_____________________________________________\n");
 
     printf("________________ Write Approx Field ________________\n");
@@ -76,7 +94,10 @@ int main(int argc, char** argv) {
                                  o::Reals(approx_target_values));
 
     // write the target mesh as vtk
-    o::vtk::write_parallel("fine2coarse_interpolation.vtk", &target_mesh, 2);
+    o::vtk::write_parallel("fine2coarse_interpolation_target.vtk", &target_mesh,
+                           2);
+    o::vtk::write_parallel("fine2coarse_interpolation_source.vtk", &source_mesh,
+                           2);
     printf("______________________ Done _______________________\n");
     return 0;
 }

@@ -80,13 +80,13 @@ int main(int argc, char** argv) {
         source_mesh.get_array<o::Real>(o::VERT, "sinxcosy");
 
     o::Real radius2 = interpolation_radius * interpolation_radius;
-    o::Read<o::Real> radii2(target_mesh.nverts(), radius2, "radii2");
 
     printf("________________ MLS Interpolation ________________\n");
     SupportResults support =
-        searchNeighbors(source_mesh, target_mesh, radius2, 12, false);
-    auto approx_target_values = mls_interpolation(
-        source_values, source_coords, tartget_coords, support, 2, 2, radius2);
+        searchNeighbors(source_mesh, target_mesh, radius2, 15, true);
+    auto approx_target_values =
+        mls_interpolation(source_values, source_coords, tartget_coords, support,
+                          2, 2, support.radii2);
     printf("_____________________________________________\n");
 
     printf("________________ Write Approx Field ________________\n");

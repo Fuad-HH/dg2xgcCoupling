@@ -18,7 +18,7 @@
 #include <cstdio>
 #include <fstream>
 #include <pcms/interpolator/MLSInterpolation.hpp>
-#include <pcms/interpolator/adj_search_dega2.hpp>
+#include <pcms/interpolator/adj_search.hpp>
 #include <string>
 
 o::Real calculate_l2_error(o::Mesh& mesh, std::string apporx_field_name,
@@ -130,7 +130,7 @@ void cell2node(o::Mesh& mesh, const std::string field_name,
             source_locations[2 * face + 1] = centroid[1];
         });
 
-    SupportResults support = searchNeighbors(mesh, radius_sq, 12);
+    SupportResults support = searchNeighbors(mesh, radius_sq, 15, true);
     o::Reals field = mesh.get_array<o::Real>(2, field_name);
     auto interpolated_values = mls_interpolation(
         field, source_locations, coords, support, 2, 2, support.radii2);
